@@ -13,22 +13,22 @@ import java.util.ArrayList;
 public class p2pClient 
 {
 
-    public UDPReciever reciever;
-    private String[] iniData;
+    public UDPReciever reciever; 
     private List<String> songData; 
     private int minPort;
     private int maxPort;
+    private boolean keepRunning = true;
     
-    public p2pClient(int minPort, int maxPort, String[] iniData)
+    public p2pClient(int minPort, int maxPort, String[] data)
     {
-        this.iniData = iniData;
+        
         this.maxPort = maxPort;
         this.minPort = minPort;
         
         this.songData = new ArrayList<>();
-        for(int i = 0; i< iniData.length; i++)
+        for(int i = 0; i< data.length; i++)
         {
-            this.songData.add(iniData[i]);
+            this.songData.add(data[i]);
         }
         
         boolean canConnect = false;
@@ -45,19 +45,17 @@ public class p2pClient
                     ex.printStackTrace();
                     System.exit(i);
                 }
+                canConnect = false;
             }
         }
     }
     
     private void sendReply(UDPMessage msg)
     {
-        String msgData = "";
-        for(int i = 0; i < iniData.length; i++)
-        {
-            msgData += iniData[i] + "\n";
-        }
+        this.addAnswerToList(msg.getContent());
+        String msgData = getSongListAsString();
         
-        UDPMessage outMsg = new UDPMessage(MSGType.ANSWER, msgData);
+        UDPMessage outMsg = new UDPMessage(MSGType.ANSWER, msgData, this.reciever.port);     
         try
         {
            UDPSender.send(msg.getSenderAddress(), msg.getSenderPort(), outMsg);
@@ -80,7 +78,7 @@ public class p2pClient
             boolean add = true;
             for(String str : this.songData)
             {
-                if(str.compareTo(data[i]) == 0)
+                if(str.compareTo(data[i]) == 0 || data[i] == null || data[i].length() == 0)
                 {
                     add = false;
                 }
@@ -113,6 +111,9 @@ public class p2pClient
             case ANSWER:
                 addAnswerToList(msg.getContent());
                 break;
+            default:
+                System.err.println("Undefined packet type!");
+                break;
         }
     }
     
@@ -122,7 +123,8 @@ public class p2pClient
         {
             try
             {
-            UDPSender.send(InetAddress.getLocalHost(), i, new UDPMessage(MSGType.REQUEST, ""));
+                UDPMessage msg = new UDPMessage(MSGType.REQUEST, getSongListAsString(), this.reciever.port);
+                UDPSender.send(InetAddress.getLocalHost(), i, msg);
         
             }catch(Exception ex)
             {
@@ -130,6 +132,17 @@ public class p2pClient
             }
         }
     }
+    
+    private String getSongListAsString()
+    {
+        String str = "";
+        for(String tmp : this.songData)
+        {
+            str += tmp + "\n";
+        }
+        return str;
+    }
+    
     
     public void run()
     {

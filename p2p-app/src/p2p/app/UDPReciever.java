@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package p2p.app;
 
 import java.util.ArrayDeque;
@@ -11,6 +6,7 @@ import java.net.DatagramSocket;
 import java.net.DatagramPacket;
 import java.io.IOException;
 import java.net.SocketException;
+import java.util.concurrent.ConcurrentLinkedQueue;
 /**
  *
  * @author phil
@@ -18,41 +14,59 @@ import java.net.SocketException;
 public class UDPReciever 
 {
     private Queue<UDPMessage> messages;
-    private int port;
+    public int port;
     private Thread thread;
+    private RecieverThread rcThread;
     private DatagramSocket socket;
     
     public UDPReciever(int port) throws SocketException
     {
+        this.messages = new ConcurrentLinkedQueue<UDPMessage>();
         this.port = port;
-        this.messages = new ArrayDeque<UDPMessage>();      
         this.socket = new DatagramSocket(port);
       
-        
-        this.thread = new Thread(new RecieverThread(this));
+        this.rcThread = new RecieverThread(this);
+        this.thread = new Thread(this.rcThread);
         thread.start();
+    }
+    
+    public void finalize()
+    {
+        this.socket.close();
+    }
+    
+    public void stop()
+    {
+        this.rcThread.stop();
+        this.socket.close();
     }
     
     public UDPMessage getMessage()
     {
-        return this.messages.poll();
+        UDPMessage msg = this.messages.peek();
+	if (msg != null) 
+        {
+            this.messages.remove(msg);
+        }
+	return msg;
       
     }
     
     private class RecieverThread implements Runnable
     {
         private UDPReciever rcv;
-        private boolean keepRunning = true;
+        private boolean keepRunning;
         private byte[] recieveBuffer = new byte[1024];
         public RecieverThread(UDPReciever rcv)
         {
             this.rcv = rcv;
+            this.keepRunning = true;
         }
         
         @Override
         public void run()
         {
-            DatagramPacket packet = new DatagramPacket(recieveBuffer, 1024);
+            DatagramPacket packet = new DatagramPacket(recieveBuffer, recieveBuffer.length);
             
             
             while(keepRunning)

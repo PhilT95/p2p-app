@@ -4,6 +4,7 @@ package p2p.app;
 
 import java.net.InetAddress;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 /**
  *
  * @author phil
@@ -25,8 +26,11 @@ public class UDPMessage
     private InetAddress addr;
     private int port;
     
+    public static final int HEADER_SIZE = 5;
+    public static final int MAX_PAYLOAD_SIZE = 1024;
     
-    public UDPMessage(MSGType type, String data)
+    
+    public UDPMessage(MSGType type, String data, int port)
     {
         switch(type)
         {
@@ -41,6 +45,7 @@ public class UDPMessage
                 break;
         }       
         this.content = data;
+        this.port = port;
     }
     
     public UDPMessage(byte type, String data, InetAddress addr, int port)
@@ -70,43 +75,56 @@ public class UDPMessage
         }
     }
     
-    public byte[] toByteArray(int size)
+    public byte[] toByteArray()
     {
-        byte[] data = new byte[size];
-        data[0] = this.type;
-        byte[] contentData = this.content.getBytes();
-        
-        for(int i =0; i< size-1 && i+1 <contentData.length;i++)
-        {
-            data[i] = contentData[i+1];
-        }
-        
-        
-        return data;
+        byte[] data = new byte[HEADER_SIZE + MAX_PAYLOAD_SIZE];
+		
+		//Header
+		data[0] = this.type;
+		ByteBuffer buff = ByteBuffer.allocate(4);
+		buff.putInt(this.port);
+		byte[] portData = buff.array();
+		for (int i = 0; i < 4; ++i) {
+			data[i+1] = portData[i];
+		}
+		
+		//Content
+		byte[] cData = this.content.getBytes();
+		
+		for (int i = HEADER_SIZE; i < data.length; ++i) {
+			if (i - HEADER_SIZE < cData.length)
+				data[i] = cData[i-HEADER_SIZE];
+			else
+				data[i] = 0;
+			
+		}
+		return data;
     }
     
     
     public int getSenderPort() throws IOException
     {
-        if(this.type != 1)
-        {
-            throw new IOException("Incompatible type for sender address!");
-        }
         return this.port;
     }
     
        public InetAddress getSenderAddress() throws IOException
     {
-        if(this.type != 1)
-        {
-            throw new IOException("Incompatible type for sender address!");
-        }
         return this.addr;
     }
     
     public static UDPMessage fromByteArray(byte[] data, InetAddress addr, int port)
     {
-        System.out.println("Data recieved" + data[0]);
-        return new UDPMessage(data[0], new String(data,1,data.length-1), addr, port);
+       	byte[] portData = new byte[4];
+        for (int i = 0; i < 4; ++i) 
+        {
+            portData[i] = data[i+1];
+        }
+		
+	ByteBuffer buff = ByteBuffer.wrap(portData);
+	int destPort = buff.getInt();
+		
+	String content = new String(data, HEADER_SIZE, data.length - HEADER_SIZE);
+		
+	return new UDPMessage(data[0], content, addr, destPort);
     }
 }

@@ -16,7 +16,7 @@ public class UDPSender
     {
         DatagramSocket socket = new DatagramSocket();
         
-        byte[] data = msg.toByteArray(1024);
+        byte[] data = msg.toByteArray();
         
         DatagramPacket packet =  new DatagramPacket(data, data.length, dest, port);
         
